@@ -1,8 +1,10 @@
 import torch as t
 import torch.nn as nn
 from jaxtyping import Float
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from torch.utils.data import DataLoader
+from torch import Tensor
+import numpy as np
 
 
 class LogisticRegression(nn.Module):
@@ -21,17 +23,18 @@ class LogisticRegression(nn.Module):
         out = self.softmax(logits)
         return out
 
-    def softmax(self, x: Float[Tensor, "batch n_features"]) -> Float[Tensor, "batch n_features"]:
+    def softmax(self, x: Float[Tensor, "batch n_classes"]) -> Float[Tensor, "batch n_classes"]:
         prob_sum = x.exp().sum(dim=-1)
-        probs = x.exp() / prob_sum
+        # print(f"shape: x: {x.shape}, prob_sum: {prob_sum.shape}")
+        probs = x.exp() / prob_sum.unsqueeze(-1)
         return probs
 
 @dataclass
 class TrainConfig:
-    lr: float = 1e-4
-    epochs: int = 3
     train_loader: DataLoader
     test_loader: DataLoader
+    lr: float = 1e-4
+    epochs: int = 3
 
 
 class LogisticRegressionTrainer:
@@ -42,16 +45,22 @@ class LogisticRegressionTrainer:
         self.train_loader = config.train_loader
         self.test_loader = config.test_loader
 
-    def train(self) -> Float[Tensor, ""]:
+    def train(self) -> list[float]:
         """assume y is one-hot encoded"""
+        loss_list = []
         for epoch in range(self.epochs):
+            epoch_loss_list = []
             for X, y in self.train_loader:
                 self.optimizer.zero_grad()
                 probs = self.model(X)
                 loss = self.cross_entropy(y, probs)
+                epoch_loss_list.append(loss.item())
                 loss.backward()
                 self.optimizer.step()
-        return loss
+            epoch_loss = np.mean(epoch_loss_list)
+            loss_list.append(epoch_loss)
+            print(f"epoch loss for epoch {epoch}: {epoch_loss}")
+        return loss_list
 
     @t.inference_mode()
     def evaluate(self) -> tuple[Float[Tensor, "n_classes"], Float[Tensor, "n_classes"]]:
@@ -59,12 +68,10 @@ class LogisticRegressionTrainer:
         true_pos = t.zeros(n_classes)
         false_pos = t.zeros(n_classes)
         false_neg = t.zeros(n_classes)
-        total = 0
         for X, y in self.test_loader:
             probs = self.model(X)
             y_label = y.argmax(dim=-1)
             y_pred_label = probs.argmax(dim=-1)
-            total += len(y_label)
             for c in range(n_classes):
                 true_pos[c] += ((y_pred_label == c) & (y_label == c)).float().sum()
                 false_pos[c] += ((y_pred_label == c) & (y_label != c)).float().sum()
@@ -72,7 +79,6 @@ class LogisticRegressionTrainer:
 
         precision = true_pos / (true_pos + false_pos)
         recall = true_pos / (true_pos + false_neg)
-
         return precision, recall
 
     def cross_entropy(

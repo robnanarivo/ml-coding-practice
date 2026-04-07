@@ -36,18 +36,21 @@ class LinearRegressionTrainer:
         self.train_loader = train_loader
         self.test_loader = test_loader
     
-    def train(self) -> Float[Tensor, ""]:
+    def train(self) -> list[float]:
+        loss_list = []
         for epoch in range(self.epochs):
-            epoch_loss = []
+            epoch_loss_list = []
             for i, (X, y) in enumerate(self.train_loader):
                 self.optimizer.zero_grad()
                 y_pred = self.model(X)
                 loss = MSEloss(y_pred, y)
-                epoch_loss.append(loss.item())
+                epoch_loss_list.append(loss.item())
                 loss.backward()
                 self.optimizer.step()
+            epoch_loss = np.mean(epoch_loss_list)
+            loss_list.append(epoch_loss)
             print(f"Train loss for epoch {epoch}: {np.mean(epoch_loss)}")
-        return loss
+        return loss_list
 
     @t.inference_mode()
     def evaluate(self):

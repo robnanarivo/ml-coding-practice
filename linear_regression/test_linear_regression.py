@@ -113,9 +113,10 @@ class TestLinearRegressionTrainer:
         model = LinearRegression(3, 1)
         train_loader, test_loader = make_loaders()
         trainer = LinearRegressionTrainer(model, epochs=1, train_loader=train_loader, test_loader=test_loader)
-        loss = trainer.train()
-        assert isinstance(loss, t.Tensor)
-        assert loss.dim() == 0  # scalar
+        loss_list = trainer.train()
+        assert isinstance(loss_list, list)
+        assert len(loss_list) == 1
+        assert isinstance(loss_list[0], float)
 
     def test_train_reduces_loss(self):
         """Evaluate loss should decrease after training."""

@@ -3,3 +3,4 @@ numpy
 jupyter
 jaxtyping
 pytest
+einops
